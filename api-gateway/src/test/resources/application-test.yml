@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+    config:
+      enabled: false
+
+eureka:
+  client:
+    enabled: false
+
+jwt:
+  secret: testSecretKeyForJWTTokenGenerationAndValidation2025TestOnly
+
+logging:
+  level:
+    root: WARN
+    com.ecommerce.gateway: DEBUG
+
