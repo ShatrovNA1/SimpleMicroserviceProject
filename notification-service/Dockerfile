@@ -1,12 +1,15 @@
-FROM eclipse-temurin:25-jre-alpine
-
+FROM eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /app
+COPY gradle gradle
+COPY gradlew build.gradle.kts settings.gradle.kts ./
+COPY notification-service/build.gradle.kts notification-service/
+COPY notification-service/src notification-service/src
+RUN chmod +x gradlew
+RUN ./gradlew :notification-service:bootJar -x test --no-daemon
 
-COPY build/libs/*.jar app.jar
-
-ENV JAVA_OPTS="-Xms256m -Xmx512m"
-
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=build /app/notification-service/build/libs/*.jar app.jar
 EXPOSE 8085
-
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
 
