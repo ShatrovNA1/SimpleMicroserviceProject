@@ -1,9 +1,4 @@
-version: '3.8'
-
 services:
-  # ==================== INFRASTRUCTURE ====================
-
-  # PostgreSQL databases
   postgres-user:
     image: postgres:16-alpine
     container_name: postgres-user
@@ -12,7 +7,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "5437:5432"
     volumes:
       - postgres-user-data:/var/lib/postgresql/data
     networks:
@@ -22,7 +17,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
   postgres-product:
     image: postgres:16-alpine
     container_name: postgres-product
@@ -41,7 +35,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
   postgres-order:
     image: postgres:16-alpine
     container_name: postgres-order
@@ -60,7 +53,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
   postgres-payment:
     image: postgres:16-alpine
     container_name: postgres-payment
@@ -79,7 +71,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
   postgres-notification:
     image: postgres:16-alpine
     container_name: postgres-notification
@@ -98,8 +89,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # Kafka & Zookeeper
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
@@ -115,7 +104,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka
@@ -140,18 +128,14 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
-  # Mailhog for email testing
   mailhog:
     image: mailhog/mailhog:latest
     container_name: mailhog
     ports:
-      - "1025:1025"  # SMTP
-      - "8025:8025"  # Web UI
+      - "1025:1025"
+      - "8025:8025"
     networks:
       - ecommerce-network
-
-  # Zipkin for distributed tracing
   zipkin:
     image: openzipkin/zipkin:latest
     container_name: zipkin
@@ -159,14 +143,10 @@ services:
       - "9411:9411"
     networks:
       - ecommerce-network
-
-  # ==================== MICROSERVICES ====================
-
-  # Eureka Server - Service Discovery
   eureka-server:
     build:
-      context: .
-      dockerfile: eureka-server/Dockerfile
+      context: ./eureka-server
+      dockerfile: Dockerfile
     container_name: eureka-server
     ports:
       - "8761:8761"
@@ -179,18 +159,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
-  # Config Server
   config-server:
     build:
-      context: .
-      dockerfile: config-server/Dockerfile
+      context: ./config-server
+      dockerfile: Dockerfile
     container_name: config-server
     ports:
       - "8888:8888"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_PROFILES_ACTIVE=docker,native
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCHLOCATIONS=file:/app/config-repo
+    volumes:
+      - ./config-repo:/app/config-repo:ro
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -201,12 +182,10 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
-  # API Gateway
   api-gateway:
     build:
-      context: .
-      dockerfile: api-gateway/Dockerfile
+      context: ./api-gateway
+      dockerfile: Dockerfile
     container_name: api-gateway
     ports:
       - "8080:8080"
@@ -214,7 +193,6 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
-      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -227,23 +205,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
-  # User Service
   user-service:
     build:
-      context: .
-      dockerfile: user-service/Dockerfile
+      context: ./user-service
+      dockerfile: Dockerfile
     container_name: user-service
     ports:
       - "8081:8081"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-user:5432/userdb
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       postgres-user:
@@ -259,23 +233,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
-  # Product Service
   product-service:
     build:
-      context: .
-      dockerfile: product-service/Dockerfile
+      context: ./product-service
+      dockerfile: Dockerfile
     container_name: product-service
     ports:
       - "8082:8082"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-product:5432/productdb
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
     depends_on:
       postgres-product:
         condition: service_healthy
@@ -288,23 +258,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
-  # Order Service
   order-service:
     build:
-      context: .
-      dockerfile: order-service/Dockerfile
+      context: ./order-service
+      dockerfile: Dockerfile
     container_name: order-service
     ports:
       - "8083:8083"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-order:5432/orderdb
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       postgres-order:
@@ -320,23 +286,19 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
-  # Payment Service
   payment-service:
     build:
-      context: .
-      dockerfile: payment-service/Dockerfile
+      context: ./payment-service
+      dockerfile: Dockerfile
     container_name: payment-service
     ports:
       - "8084:8084"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-payment:5432/paymentdb
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
-      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       postgres-payment:
@@ -352,25 +314,21 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
-  # Notification Service
   notification-service:
     build:
-      context: .
-      dockerfile: notification-service/Dockerfile
+      context: ./notification-service
+      dockerfile: Dockerfile
     container_name: notification-service
     ports:
       - "8085:8085"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
-      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-notification:5432/notificationdb
       - SPRING_DATASOURCE_USERNAME=postgres
       - SPRING_DATASOURCE_PASSWORD=postgres
       - SPRING_MAIL_HOST=mailhog
       - SPRING_MAIL_PORT=1025
-      - MANAGEMENT_ZIPKIN_TRACING_ENDPOINT=http://zipkin:9411/api/v2/spans
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
       postgres-notification:
@@ -379,8 +337,6 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
-      mailhog:
-        condition: service_started
     networks:
       - ecommerce-network
     healthcheck:
@@ -388,15 +344,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-
 networks:
   ecommerce-network:
     driver: bridge
-
 volumes:
   postgres-user-data:
   postgres-product-data:
   postgres-order-data:
   postgres-payment-data:
   postgres-notification-data:
-
